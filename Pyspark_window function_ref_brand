@@ -1,0 +1,120 @@
+//* This is a code copied from zeppelin for my reference: Spark Window function with row_number
+//*
+%livy2.pyspark
+temp_ref_brand = spark.sql("""
+SELECT
+t.marche_veh as marche,
+t.mod as mod,
+t.criteres007 as projet,
+c.criteres as brand
+FROM
+(SELECT
+a.invarbcv,
+a.marche_veh,
+a.mod,
+a.criteres007
+FROM db_gold_irn_70374_ddl.veh_enrichie a
+JOIN db_gold_irn_70374_ddl.veh_def b on a.invarbcv = b.invarbcv
+WHERE code_objet = '008') t
+JOIN db_gold_irn_70374_ddl.veh_def c on c.invarbcv = t.invarbcv
+WHERE code_objet = '336'"""
+)
+
+//*
+%livy2.pyspark
+temp_ref_brand.show()
++------+---+------+-----+
+|marche|mod|projet|brand|
++------+---+------+-----+
+|BRESGP|79M|X79   |APL03|
+|FRANGP|52B|X52   |APL05|
+|ITALGP|CL4|X98   |APL03|
+|GLFCOC|FLU|X38   |APL03|
+|POLOGP|M3B|X95   |APL03|
+|HOLLGP|67F|X67   |APL05|
+|NISSGP|B1A|XMP   |APL04|
+|ALLEGP|CL4|X98   |APL03|
+|ARGEGP|KAM|X76   |APL03|
+|TURQGP|CL4|X98   |APL03|
+|RUSSGP|90B|X90   |APL03|
+|LADAGP|90K|X90   |APL11|
+|MBVANS|KU2|X61   |APL12|
+|LADAGP|90K|X90   |APL11|
+|BRESGP|79M|X79   |APL03|
+|SUISGP|87J|X87   |APL03|
+|SLVQGP|TW3|X07   |APL03|
+|TURQGP|FLU|X38   |APL03|
+|ALGEGP|46L|X52   |APL03|
+|COREGP|FLU|X38   |APL08|
++------+---+------+-----+
+only showing top 20 rows
+
+//*
+%livy2.pyspark
+temp_ref_brand_count = temp_ref_brand.groupBy("marche", "mod","projet", "brand").count().orderBy("marche", "mod","projet", "brand")
+
+//*
+%livy2.pyspark
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
+windowSpec = Window.partitionBy("marche", "mod", "projet").orderBy(desc("count"))
+tempdf_rownum = temp_ref_brand_count.withColumn("row_number",row_number().over(windowSpec))
+tempdf_rownum.show()
+
++------+---+------+-----+-----+----------+
+|marche|mod|projet|brand|count|row_number|
++------+---+------+-----+-----+----------+
+|AFADAD|FLU|X38   |APL03|   85|         1|
+|AFSUGP|JD1|XJD   |APL03| 8196|         1|
+|BELGGP|KEX|X76   |APL03|    1|         1|
+|BULGGP|79H|X79   |APL05| 2916|         1|
+|BULGGP|ZGH|XZG   |APL03|  230|         1|
+|CENTMR|KEM|X76   |APL03| 1288|         1|
+|CHYPGP|TRP|X82   |APL03|    5|         1|
+|ESPAGP|TFU|X83   |APL03|  931|         1|
+|FRANMA|CS5|XJA   |APL03|   93|         1|
+|FRANVO|NF1|XNF   |APL03|   44|         1|
+|GUADGP|TW3|X07   |APL03| 1049|         1|
+|IOINDI|ZOE|X10   |APL03|   22|         1|
+|ISLAGP|SL4|XFA   |APL03|   42|         1|
+|ITALGP|67P|X67   |APL05|15792|         1|
+|ITALGP|S3L|X95   |APL03| 4234|         1|
+|LDKAZA|GFK|XGF   |APL11| 6051|         1|
+|LDRUSS|90F|X90   |APL11|    1|         1|
+|MAROGP|87J|X87   |APL03| 4416|         1|
+|MOLDGP|CK4|X98   |APL03|   82|         1|
+|NZLAGP|TRU|X82   |APL03|  354|         1|
++------+---+------+-----+-----+----------+
+only showing top 20 rows
+
+//*
+from pyspark.sql.functions import col
+ref_brand = tempdf_rownum.filter(col("row_number")== 1)
+
+//*
+ref_brand.show()
++------+---+------+-----+-----+----------+
+|marche|mod|projet|brand|count|row_number|
++------+---+------+-----+-----+----------+
+|AFADAD|FLU|X38   |APL03|   85|         1|
+|AFSUGP|JD1|XJD   |APL03| 8196|         1|
+|BELGGP|KEX|X76   |APL03|    1|         1|
+|BULGGP|79H|X79   |APL05| 2916|         1|
+|BULGGP|ZGH|XZG   |APL03|  230|         1|
+|CENTMR|KEM|X76   |APL03| 1288|         1|
+|CHYPGP|TRP|X82   |APL03|    5|         1|
+|ESPAGP|TFU|X83   |APL03|  931|         1|
+|FRANMA|CS5|XJA   |APL03|   93|         1|
+|FRANVO|NF1|XNF   |APL03|   44|         1|
+|GUADGP|TW3|X07   |APL03| 1049|         1|
+|IOINDI|ZOE|X10   |APL03|   22|         1|
+|ISLAGP|SL4|XFA   |APL03|   42|         1|
+|ITALGP|67P|X67   |APL05|15792|         1|
+|ITALGP|S3L|X95   |APL03| 4234|         1|
+|LDKAZA|GFK|XGF   |APL11| 6051|         1|
+|LDRUSS|90F|X90   |APL11|    1|         1|
+|MAROGP|87J|X87   |APL03| 4416|         1|
+|MOLDGP|CK4|X98   |APL03|   82|         1|
+|NZLAGP|TRU|X82   |APL03|  354|         1|
++------+---+------+-----+-----+----------+
+only showing top 20 rows
